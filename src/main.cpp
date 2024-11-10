@@ -9,13 +9,12 @@ const byte MLX90640_address = 0x33;
 
 paramsMLX90640 mlx90640;
 float mlx90640To[768];
+
 float MaxTemp;
 float MinTemp;
 float CenterTemp;
 
-const byte calcStart = 20;
-
-TaskHandle_t Task0;
+TaskHandle_t getFrameArray;
 TaskHandle_t Task1;
 
 boolean isConnected(){
@@ -25,27 +24,30 @@ boolean isConnected(){
   return (true);
 }
 
-void Task0code(void* pvParameters){
+void getFrameArraycode(void* pvParameters){
 	for(;;){
     for (byte x = 0; x < 2; x++){
-  		uint16_t mlx90640Frame[834];
-  		int status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame);
-    	float vdd = MLX90640_GetVdd(mlx90640Frame, &mlx90640);
-  		float Ta = MLX90640_GetTa(mlx90640Frame, &mlx90640);
-  		float tr = Ta - TA_SHIFT;
-  		float emissivity = 0.95;
-  		MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
+      uint16_t mlx90640Frame[834];
+      int status = MLX90640_GetFrameData(MLX90640_address, mlx90640Frame);
+      float vdd = MLX90640_GetVdd(mlx90640Frame, &mlx90640);
+      float Ta = MLX90640_GetTa(mlx90640Frame, &mlx90640);
+      float tr = Ta - TA_SHIFT;
+      float emissivity = 0.95;
+      MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
+      
       CenterTemp = (mlx90640To[367]+mlx90640To[368]+mlx90640To[399]+mlx90640To[400]) / 4.0;
       MaxTemp = mlx90640To[0];
       MinTemp = mlx90640To[0];
-  		for (int x = 0; x < 768; x++){
+  		
+      for (int x = 0; x < 768; x++){
         if (mlx90640To[x] > MaxTemp){
           MaxTemp = mlx90640To[x];
         }
         if (mlx90640To[x] < MinTemp){
           MinTemp = mlx90640To[x];
         }
-  		}
+  		
+      }
   	}
     Serial.print("Min: ");
     Serial.print(MinTemp);
@@ -61,7 +63,7 @@ void Task0code(void* pvParameters){
 
 
 	/*
-  Serial.print("Task0 running on core ");
+  Serial.print("getFrameArray running on core ");
 	Serial.println(xPortGetCoreID());
 	
   for (;;) {
@@ -102,9 +104,9 @@ void setup() {
 		Serial.println("Parameter extract failed");
 	MLX90640_SetRefreshRate(MLX90640_address, 0x06);
 	Wire.setClock(8000000);
-  //create a task that executes the Task0code() function, with priority 1 and executed on core 0
-  xTaskCreatePinnedToCore(Task0code, "Task0", 10000, NULL, 1, &Task0, 0);
-  //create a task that executes the Task0code() function, with priority 1 and executed on core 1
+  //create a task that executes the getTask0code() function, with priority 1 and executed on core 0
+  xTaskCreatePinnedToCore(getFrameArraycode, "getFrameArray", 10000, NULL, 1, &getFrameArray, 0);
+  //create a task that executes the getTask1code() function, with priority 1 and executed on core 1
   xTaskCreatePinnedToCore(Task1code, "Task1", 10000, NULL, 1, &Task1, 1);
 }
 
